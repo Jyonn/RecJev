@@ -1,0 +1,16 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "recjev"
+version = "0.1.0"
+description = "Reproducible candidate recommendation evaluation for Jev and LLMs"
+requires-python = ">=3.10"
+dependencies = ["requests>=2.31,<3", "python-dotenv>=1,<2"]
+
+[project.scripts]
+recjev = "recjev.cli:main"
+
+[tool.setuptools.packages.find]
+include = ["recjev*"]
