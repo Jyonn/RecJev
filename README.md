@@ -13,6 +13,14 @@ cp .env.example .env
 
 Download [MovieLens 1M](https://grouplens.org/datasets/movielens/1m/) and extract it so `data/ml-1m/movies.dat` and `data/ml-1m/ratings.dat` exist. The dataset is ignored by Git. Fill the relevant API key in `.env`; endpoints and Jev model can be changed there. Do not commit `.env`.
 
+To export and inspect the fixed 1000-case evaluation set without calling a model:
+
+```bash
+recjev-prepare --data data/ml-1m --sample-size 1000 --seed 42 --candidates 10 --history-size 20 --output data/ml-1m/eval-1000-seed42.jsonl
+```
+
+The command prints the JSONL SHA-256 checksum. The file stays local because `data/` is ignored by Git. Use the same sampling parameters for each model run.
+
 ## Run
 
 ```bash
