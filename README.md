@@ -28,6 +28,18 @@ recjev --data data/ml-1m --provider ohmygpt --model gpt-4o --sample-size 1000 --
 recjev --data data/ml-1m --provider jev --sample-size 1000 --seed 42 --candidates 10 --top-k 3 --output results/jev.jsonl
 ```
 
+For a fixed prefix of the exported evaluation set, use the same file and limit for each model:
+
+```bash
+recjev --cases-file data/ml-1m/eval-1000-seed42.jsonl --limit 200 --provider jev --top-k 3 --output results/benchmark200/jev.jsonl --resume
+recjev --cases-file data/ml-1m/eval-1000-seed42.jsonl --limit 200 --provider ohmygpt --model gpt-4o --top-k 3 --output results/benchmark200/gpt-4o.jsonl --resume
+recjev --cases-file data/ml-1m/eval-1000-seed42.jsonl --limit 200 --provider popularity --data data/ml-1m --top-k 3 --output results/benchmark200/popularity.jsonl --resume
+```
+
+`--resume` validates the selected cases, model, Top-K, rate snapshot, and run settings against a companion `.meta.json` file, then skips completed rows. Each row is flushed to disk immediately. A network or provider HTTP failure stops the run and leaves that case pending for the next invocation. A complete but malformed model answer is recorded as a failed case. Without `--resume`, the command refuses to overwrite existing results.
+
+The popularity baseline counts ratings of at least 4 from each user's history before their held-out positive and ranks candidates by that count. It needs no API key. Its local runtime is reported separately from hosted model latency.
+
 Use the exact model ID available to your OhMyGPT account for GPT, Qwen, Llama, or DeepSeek. A small smoke run uses `--sample-size 5`. `--top-k 1` is Top-1; larger values request an ordered Top-K list. The same seed, sample size, candidate count, and history size produce the same cases across runs. The CLI currently uses MovieLens 1M only; no data is downloaded automatically.
 
 Some models reject `temperature=0`. Add `--omit-temperature` for those models; this uses the provider default and should be recorded when comparing results.

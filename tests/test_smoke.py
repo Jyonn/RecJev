@@ -1,10 +1,13 @@
 import tempfile
 import unittest
 import json
+import requests
 from pathlib import Path
 from unittest.mock import patch
 
 from recjev.evaluate import evaluate
+from recjev.cases import load_cases
+from recjev.baselines import Popularity
 from recjev.models import Jev, OhMyGPT
 from recjev.movielens import MovieLens1M
 from recjev.protocol import Case, Item
@@ -18,6 +21,12 @@ class FirstCandidate:
 class FailingModel:
     def rank(self, case, top_k):
         raise RuntimeError("unavailable")
+
+
+class NetworkFailingModel:
+    model = "offline"
+    def rank(self, case, top_k):
+        raise requests.ConnectionError("offline")
 
 
 class SmokeTest(unittest.TestCase):
@@ -53,6 +62,7 @@ class SmokeTest(unittest.TestCase):
             report = evaluate(a, FirstCandidate(), 2, root / "predictions.jsonl")
             self.assertEqual(report["hit_at_k"], 1)
             self.assertTrue((root / "predictions.jsonl").exists())
+            self.assertEqual(Popularity(root).rank(a[0], 2)[0] in {item.id for item in a[0].candidates}, True)
 
     def test_prediction_records_usage_and_rate(self):
         case = Case("u", (Item("1", "History"),),
@@ -70,6 +80,35 @@ class SmokeTest(unittest.TestCase):
             failed = evaluate([case], FailingModel(), 1, Path(tmp) / "failed.jsonl")
             self.assertEqual(failed["failures"], 1)
             self.assertIsNone(failed["mean_latency_s"])
+
+    def test_resume_uses_fixed_prefix_and_rejects_changed_settings(self):
+        case = Case("u", (Item("1", "History"),),
+                    (Item("2", "Alpha"), Item("3", "Beta")), "3")
+        class CountingModel:
+            model = "counting"
+            calls = 0
+            def rank(self, case, top_k):
+                self.calls += 1
+                return ["3"]
+        with tempfile.TemporaryDirectory() as tmp:
+            path = Path(tmp) / "results.jsonl"
+            model = CountingModel()
+            evaluate([case], model, 1, path)
+            self.assertEqual(model.calls, 1)
+            self.assertEqual(evaluate([case], model, 1, path, resume=True)["cases"], 1)
+            self.assertEqual(model.calls, 1)
+            with self.assertRaises(ValueError):
+                evaluate([case], model, 2, path, resume=True)
+            cases_path = Path(tmp) / "cases.jsonl"
+            cases_path.write_text(json.dumps({"case_id": "u", "history": [vars(case.history[0])],
+                                              "candidates": [vars(item) for item in case.candidates],
+                                              "positive_id": "3"}) + "\n")
+            self.assertEqual(load_cases(cases_path, 1), [case])
+
+            network_path = Path(tmp) / "network.jsonl"
+            with self.assertRaises(requests.ConnectionError):
+                evaluate([case], NetworkFailingModel(), 1, network_path)
+            self.assertEqual(network_path.read_text(), "")
 
 
 if __name__ == "__main__":

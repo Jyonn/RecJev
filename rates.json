@@ -47,5 +47,13 @@
     "as_of": "2026-09-20",
     "source": "https://next.ohmygpt.com/models/deepseek-flash",
     "note": "Compatibility alias; verify response_model and rate window before calculating cost."
+  },
+  "deepseek-flash": {
+    "currency": "CNY",
+    "unit": "per_1m_tokens",
+    "off_peak": {"input": 1.0, "cached_input": 0.02, "output": 4.0},
+    "peak": {"input": 2.0, "cached_input": 0.04, "output": 8.0},
+    "as_of": "2026-09-20",
+    "source": "https://next.ohmygpt.com/models/deepseek-flash"
   }
 }
