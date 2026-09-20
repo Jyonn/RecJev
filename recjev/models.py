@@ -14,9 +14,11 @@ def _context(case: Case) -> str:
 
 class OhMyGPT:
     def __init__(self, api_key: str, base_url: str, model: str, timeout: float = 60,
-                 temperature: float | None = 0):
+                 temperature: float | None = 0, thinking: bool | None = None):
         self.api_key, self.base_url, self.model, self.timeout = api_key, base_url.rstrip("/"), model, timeout
         self.temperature = temperature
+        self.thinking = thinking
+        self.session = requests.Session()
         self.last_usage: dict | None = None
         self.last_response_model: str | None = None
 
@@ -29,7 +31,9 @@ class OhMyGPT:
                                 {"role": "user", "content": _context(case)}]}
         if self.temperature is not None:
             payload["temperature"] = self.temperature
-        response = requests.post(
+        if self.thinking is not None:
+            payload["thinking"] = {"type": "enabled" if self.thinking else "disabled"}
+        response = self.session.post(
             f"{self.base_url}/chat/completions",
             headers={"Authorization": f"Bearer {self.api_key}"},
             json=payload,
@@ -51,6 +55,7 @@ class OhMyGPT:
 class Jev:
     def __init__(self, api_key: str, endpoint: str, model: str, timeout: float = 60):
         self.api_key, self.endpoint, self.model, self.timeout = api_key, endpoint, model, timeout
+        self.session = requests.Session()
         self.last_usage: dict | None = None
         self.last_response_model: str | None = None
 
@@ -58,7 +63,7 @@ class Jev:
         self.last_usage = None
         self.last_response_model = None
         criteria = {item.id: item.title for item in case.candidates}
-        response = requests.post(
+        response = self.session.post(
             self.endpoint,
             headers={"Authorization": f"Bearer {self.api_key}"},
             json={"model": self.model, "state": _context(case),

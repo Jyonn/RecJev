@@ -21,6 +21,7 @@ def main() -> None:
     parser.add_argument("--provider", choices=["ohmygpt", "jev", "popularity"], required=True)
     parser.add_argument("--model", help="OhMyGPT model ID or Jev model ID")
     parser.add_argument("--omit-temperature", action="store_true", help="Use provider default for models that reject temperature=0")
+    parser.add_argument("--disable-thinking", action="store_true", help="Send DeepSeek's thinking-disabled parameter")
     parser.add_argument("--sample-size", type=int, default=1000)
     parser.add_argument("--seed", type=int, default=42)
     parser.add_argument("--candidates", type=int, default=10)
@@ -54,15 +55,19 @@ def main() -> None:
         if not args.model:
             parser.error("--model is required for OhMyGPT")
         model = OhMyGPT(key, os.getenv("OHMYGPT_BASE_URL", "https://api.ohmygpt.com/v1"),
-                        args.model, temperature=None if args.omit_temperature else 0)
+                        args.model, temperature=None if args.omit_temperature else 0,
+                        thinking=False if args.disable_thinking else None)
     if not key:
         parser.error(f"Missing {args.provider.upper()}_API_KEY in .env or environment")
     with open(args.rates) as file:
         rates = json.load(file)
     config = {"provider": args.provider, "temperature": None if args.omit_temperature else 0,
               "cases_file": args.cases_file, "sample_size": None if args.cases_file else args.sample_size,
-              "seed": None if args.cases_file else args.seed,
-              "data": args.data if args.provider == "popularity" else None}
+              "seed": None if args.cases_file else args.seed}
+    if args.disable_thinking:
+        config["thinking"] = "disabled"
+    if args.provider == "popularity":
+        config["data"] = args.data
     print(json.dumps(evaluate(cases, model, args.top_k, args.output,
                               rate=rates.get(model.model), resume=args.resume,
                               run_config=config), indent=2))

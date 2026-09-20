@@ -33,7 +33,7 @@ class SmokeTest(unittest.TestCase):
     def test_provider_request_and_ranking(self):
         case = Case("u", (Item("1", "History"),),
                     (Item("2", "Alpha"), Item("3", "Beta")), "3")
-        with patch("recjev.models.requests.post") as post:
+        with patch("recjev.models.requests.Session.post") as post:
             post.return_value.json.return_value = {"model": "model-version", "usage": {"prompt_tokens": 10, "completion_tokens": 2}, "choices": [{"message": {"content": '["3", "2"]'}}]}
             llm = OhMyGPT("key", "https://example.test/v1", "model")
             self.assertEqual(llm.rank(case, 2), ["3", "2"])
@@ -42,7 +42,9 @@ class SmokeTest(unittest.TestCase):
             self.assertEqual(post.call_args.kwargs["json"]["model"], "model")
             self.assertEqual(OhMyGPT("key", "https://example.test/v1", "model", temperature=None).rank(case, 2), ["3", "2"])
             self.assertNotIn("temperature", post.call_args.kwargs["json"])
-        with patch("recjev.models.requests.post") as post:
+            OhMyGPT("key", "https://example.test/v1", "model", thinking=False).rank(case, 2)
+            self.assertEqual(post.call_args.kwargs["json"]["thinking"], {"type": "disabled"})
+        with patch("recjev.models.requests.Session.post") as post:
             post.return_value.json.return_value = {"model": "jev-version", "usage": {"input_tokens": 12}, "answers": {"recommend": {"probabilities": {"2": 0.2, "3": 0.8}}}}
             jev = Jev("key", "https://example.test/systemone", "jev")
             self.assertEqual(jev.rank(case, 2), ["3", "2"])
@@ -67,7 +69,7 @@ class SmokeTest(unittest.TestCase):
     def test_prediction_records_usage_and_rate(self):
         case = Case("u", (Item("1", "History"),),
                     (Item("2", "Alpha"), Item("3", "Beta")), "3")
-        with tempfile.TemporaryDirectory() as tmp, patch("recjev.models.requests.post") as post:
+        with tempfile.TemporaryDirectory() as tmp, patch("recjev.models.requests.Session.post") as post:
             post.return_value.json.return_value = {"model": "model-version", "usage": {"prompt_tokens": 10}, "choices": [{"message": {"content": '["3"]'}}]}
             model = OhMyGPT("key", "https://example.test/v1", "model")
             path = Path(tmp) / "predictions.jsonl"

@@ -43,6 +43,7 @@ The popularity baseline counts ratings of at least 4 from each user's history be
 Use the exact model ID available to your OhMyGPT account for GPT, Qwen, Llama, or DeepSeek. A small smoke run uses `--sample-size 5`. `--top-k 1` is Top-1; larger values request an ordered Top-K list. The same seed, sample size, candidate count, and history size produce the same cases across runs. The CLI currently uses MovieLens 1M only; no data is downloaded automatically.
 
 Some models reject `temperature=0`. Add `--omit-temperature` for those models; this uses the provider default and should be recorded when comparing results.
+DeepSeek Flash enables thinking by default; `--disable-thinking` sends its documented `thinking: disabled` setting and records that setting in the run metadata. Use a separate result file for each configuration.
 
 ## Protocol and extension
 
