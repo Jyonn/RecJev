@@ -7,7 +7,7 @@ from unittest.mock import patch
 
 from recjev.evaluate import evaluate
 from recjev.cases import load_cases
-from recjev.baselines import Popularity
+from recjev.baselines import ItemKNN, Popularity, UserKNN
 from recjev.models import Jev, OhMyGPT
 from recjev.movielens import MovieLens1M
 from recjev.protocol import Case, Item
@@ -111,6 +111,32 @@ class SmokeTest(unittest.TestCase):
             with self.assertRaises(requests.ConnectionError):
                 evaluate([case], NetworkFailingModel(), 1, network_path)
             self.assertEqual(network_path.read_text(), "")
+
+    def test_rated_low_cases_and_cf_use_training_prefix_only(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            (root / "movies.dat").write_text("".join(
+                f"{i}::Movie {i}::Drama\n" for i in range(1, 16)))
+            ratings = [(i, 5 if i <= 3 or i == 15 else 1) for i in range(1, 16)]
+            (root / "ratings.dat").write_text("".join(
+                f"1::{movie}::{rating}::{movie}\n" for movie, rating in ratings))
+            adapter = MovieLens1M(root)
+            cases = adapter.cases(sample_size=1, seed=42, candidates=10,
+                                  history_size=20, negatives="rated-low", train_fraction=0.2)
+            self.assertEqual(len(cases), 1)
+            case = cases[0]
+            self.assertEqual({item.id for item in case.history}, {"1", "2", "3"})
+            self.assertEqual({item.rating for item in case.history}, {5})
+            self.assertEqual(case.positive_id, "15")
+            self.assertTrue({item.id for item in case.candidates} <= {str(i) for i in range(4, 16)})
+            self.assertTrue(all(item.rating is None for item in case.candidates))
+            self.assertEqual(len(case.candidates), 10)
+            for baseline in (Popularity(root, train_fraction=0.2),
+                             ItemKNN(root, train_fraction=0.2),
+                             UserKNN(root, train_fraction=0.2)):
+                self.assertEqual(set(baseline.rank(case, 10)), {item.id for item in case.candidates})
+            cf = ItemKNN(root, train_fraction=0.2)
+            self.assertNotIn("15", cf.data.item_users)
 
 
 if __name__ == "__main__":

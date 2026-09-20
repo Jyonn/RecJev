@@ -6,6 +6,7 @@ from typing import Protocol
 class Item:
     id: str
     title: str
+    rating: int | None = None
 
 
 @dataclass(frozen=True)

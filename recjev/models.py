@@ -7,9 +7,12 @@ from .protocol import Case, validate_ranking
 
 
 def _context(case: Case) -> str:
-    history = "\n".join(f"- {item.title}" for item in case.history)
+    history = "\n".join(f"- {item.title}" +
+                        (f" (rating {item.rating}/5)" if item.rating is not None else "")
+                        for item in case.history)
     options = "\n".join(f"{item.id}: {item.title}" for item in case.candidates)
-    return f"Previously watched movies:\n{history}\n\nCandidate movies:\n{options}\n\nPreferences or constraints: {case.constraints or 'none'}"
+    label = "Previously rated movies" if any(item.rating is not None for item in case.history) else "Previously watched movies"
+    return f"{label}:\n{history}\n\nCandidate movies:\n{options}\n\nPreferences or constraints: {case.constraints or 'none'}"
 
 
 class OhMyGPT:

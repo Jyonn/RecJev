@@ -5,7 +5,7 @@ import os
 from dotenv import load_dotenv
 
 from .cases import load_cases
-from .baselines import Popularity
+from .baselines import ItemKNN, Popularity, UserKNN
 from .evaluate import evaluate
 from .models import Jev, OhMyGPT
 from .movielens import MovieLens1M
@@ -18,7 +18,7 @@ def main() -> None:
     parser.add_argument("--cases-file", help="Prepared JSONL cases; use with --limit for a fixed prefix")
     parser.add_argument("--limit", type=int, help="Run only the first N prepared cases")
     parser.add_argument("--resume", action="store_true", help="Append only missing cases after validating run settings")
-    parser.add_argument("--provider", choices=["ohmygpt", "jev", "popularity"], required=True)
+    parser.add_argument("--provider", choices=["ohmygpt", "jev", "popularity", "itemknn", "userknn"], required=True)
     parser.add_argument("--model", help="OhMyGPT model ID or Jev model ID")
     parser.add_argument("--omit-temperature", action="store_true", help="Use provider default for models that reject temperature=0")
     parser.add_argument("--disable-thinking", action="store_true", help="Send DeepSeek's thinking-disabled parameter")
@@ -26,6 +26,8 @@ def main() -> None:
     parser.add_argument("--seed", type=int, default=42)
     parser.add_argument("--candidates", type=int, default=10)
     parser.add_argument("--history-size", type=int, default=20)
+    parser.add_argument("--negatives", choices=["unseen", "rated-low"], default="unseen")
+    parser.add_argument("--train-fraction", type=float, default=0.8)
     parser.add_argument("--top-k", type=int, default=1)
     parser.add_argument("--output", default="results/predictions.jsonl")
     parser.add_argument("--rates", default="rates.json", help="Published model rates snapshot, keyed by requested model ID")
@@ -38,14 +40,21 @@ def main() -> None:
         if not args.data:
             parser.error("--data or --cases-file is required")
         cases = MovieLens1M(args.data).cases(sample_size=args.sample_size, seed=args.seed,
-                                              candidates=args.candidates, history_size=args.history_size)
+                                              candidates=args.candidates, history_size=args.history_size,
+                                              negatives=args.negatives, train_fraction=args.train_fraction)
         if args.limit is not None:
             cases = cases[:args.limit]
-    if args.provider == "popularity":
+    if args.provider in {"popularity", "itemknn", "userknn"}:
         if not args.data:
-            parser.error("--data is required for the popularity baseline")
+            parser.error("--data is required for local baselines")
         key = "local"
-        model = Popularity(args.data)
+        fraction = args.train_fraction if args.negatives == "rated-low" else None
+        if args.provider == "popularity":
+            model = Popularity(args.data, train_fraction=fraction)
+        elif args.provider == "itemknn":
+            model = ItemKNN(args.data, train_fraction=args.train_fraction)
+        else:
+            model = UserKNN(args.data, train_fraction=args.train_fraction)
     elif args.provider == "jev":
         key = os.getenv("JEV_API_KEY")
         model = Jev(key, os.getenv("JEV_ENDPOINT", "https://api.typesafe.ai/v1/systemone"),
@@ -63,10 +72,11 @@ def main() -> None:
         rates = json.load(file)
     config = {"provider": args.provider, "temperature": None if args.omit_temperature else 0,
               "cases_file": args.cases_file, "sample_size": None if args.cases_file else args.sample_size,
-              "seed": None if args.cases_file else args.seed}
+              "seed": None if args.cases_file else args.seed,
+              "negatives": args.negatives, "train_fraction": args.train_fraction}
     if args.disable_thinking:
         config["thinking"] = "disabled"
-    if args.provider == "popularity":
+    if args.provider in {"popularity", "itemknn", "userknn"}:
         config["data"] = args.data
     print(json.dumps(evaluate(cases, model, args.top_k, args.output,
                               rate=rates.get(model.model), resume=args.resume,
