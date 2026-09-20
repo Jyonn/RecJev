@@ -13,17 +13,22 @@ def _context(case: Case) -> str:
 
 
 class OhMyGPT:
-    def __init__(self, api_key: str, base_url: str, model: str, timeout: float = 60):
+    def __init__(self, api_key: str, base_url: str, model: str, timeout: float = 60,
+                 temperature: float | None = 0):
         self.api_key, self.base_url, self.model, self.timeout = api_key, base_url.rstrip("/"), model, timeout
+        self.temperature = temperature
 
     def rank(self, case: Case, top_k: int) -> list[str]:
         ids = [item.id for item in case.candidates]
+        payload = {"model": self.model,
+                   "messages": [{"role": "system", "content": f"Recommend movies. Return only a JSON array of exactly {top_k} distinct candidate IDs, best first. Allowed IDs: {', '.join(ids)}."},
+                                {"role": "user", "content": _context(case)}]}
+        if self.temperature is not None:
+            payload["temperature"] = self.temperature
         response = requests.post(
             f"{self.base_url}/chat/completions",
             headers={"Authorization": f"Bearer {self.api_key}"},
-            json={"model": self.model, "temperature": 0,
-                  "messages": [{"role": "system", "content": f"Recommend movies. Return only a JSON array of exactly {top_k} distinct candidate IDs, best first. Allowed IDs: {', '.join(ids)}."},
-                               {"role": "user", "content": _context(case)}]},
+            json=payload,
             timeout=self.timeout,
         )
         response.raise_for_status()

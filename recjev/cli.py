@@ -15,6 +15,7 @@ def main() -> None:
     parser.add_argument("--data", required=True, help="Extracted MovieLens 1M directory")
     parser.add_argument("--provider", choices=["ohmygpt", "jev"], required=True)
     parser.add_argument("--model", help="OhMyGPT model ID or Jev model ID")
+    parser.add_argument("--omit-temperature", action="store_true", help="Use provider default for models that reject temperature=0")
     parser.add_argument("--sample-size", type=int, default=1000)
     parser.add_argument("--seed", type=int, default=42)
     parser.add_argument("--candidates", type=int, default=10)
@@ -34,7 +35,8 @@ def main() -> None:
         key = os.getenv("OHMYGPT_API_KEY")
         if not args.model:
             parser.error("--model is required for OhMyGPT")
-        model = OhMyGPT(key, os.getenv("OHMYGPT_BASE_URL", "https://api.ohmygpt.com/v1"), args.model)
+        model = OhMyGPT(key, os.getenv("OHMYGPT_BASE_URL", "https://api.ohmygpt.com/v1"),
+                        args.model, temperature=None if args.omit_temperature else 0)
     if not key:
         parser.error(f"Missing {args.provider.upper()}_API_KEY in .env or environment")
     print(json.dumps(evaluate(cases, model, args.top_k, args.output), indent=2))

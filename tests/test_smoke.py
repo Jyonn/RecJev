@@ -22,6 +22,8 @@ class SmokeTest(unittest.TestCase):
             post.return_value.json.return_value = {"choices": [{"message": {"content": '["3", "2"]'}}]}
             self.assertEqual(OhMyGPT("key", "https://example.test/v1", "model").rank(case, 2), ["3", "2"])
             self.assertEqual(post.call_args.kwargs["json"]["model"], "model")
+            self.assertEqual(OhMyGPT("key", "https://example.test/v1", "model", temperature=None).rank(case, 2), ["3", "2"])
+            self.assertNotIn("temperature", post.call_args.kwargs["json"])
         with patch("recjev.models.requests.post") as post:
             post.return_value.json.return_value = {"answers": {"recommend": {"probabilities": {"2": 0.2, "3": 0.8}}}}
             self.assertEqual(Jev("key", "https://example.test/systemone", "jev").rank(case, 2), ["3", "2"])

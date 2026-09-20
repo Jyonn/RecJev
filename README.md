@@ -30,6 +30,8 @@ recjev --data data/ml-1m --provider jev --sample-size 1000 --seed 42 --candidate
 
 Use the exact model ID available to your OhMyGPT account for GPT, Qwen, Llama, or DeepSeek. A small smoke run uses `--sample-size 5`. `--top-k 1` is Top-1; larger values request an ordered Top-K list. The same seed, sample size, candidate count, and history size produce the same cases across runs. The CLI currently uses MovieLens 1M only; no data is downloaded automatically.
 
+Some models reject `temperature=0`. Add `--omit-temperature` for those models; this uses the provider default and should be recorded when comparing results.
+
 ## Protocol and extension
 
 `recjev/protocol.py` defines `Case`, `DatasetAdapter`, and `Recommender`. A dataset adapter implements `cases(sample_size, seed, candidates, history_size)` and returns cases with stable IDs, a history, candidates, and a held out positive. Add another adapter and select it in `cli.py`. A model implements `rank(case, top_k)` and returns distinct candidate IDs in ranked order. Add its configuration in `.env.example` and construction in `cli.py`.
