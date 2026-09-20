@@ -39,6 +39,9 @@ Some models reject `temperature=0`. Add `--omit-temperature` for those models; t
 MovieLens cases take each user's last rating of at least 4 as the positive, earlier rated movies as history, and uniformly sample negatives from movies the user never rated. Cases lacking enough negatives are skipped. The dataset gives no true negative labels, so Hit@K measures retrieval of a sampled held out positive, not general preference quality. `Case.constraints` reserves a field for a future constraint aware task. Jev returns a Choice distribution; Top-K is the highest probability IDs. The LLM is asked for an ordered list directly, so the ranking mechanisms differ. This should be stated when reporting comparative results.
 
 This minimal release records latency, but not cost because billing rates depend on the selected provider/model and account. API failures are retained as failed cases in the prediction file and count as misses. For publication, pin model IDs, record pricing separately, and retain the output JSONL and command line parameters.
+Each prediction record also stores the requested model, returned model, the provider's raw `usage` token counts (when supplied), and the published rate snapshot from `rates.json`. Update that file before a new experiment or pass another file with `--rates`. Rates use the listed currency per million tokens; they are not proof of the account's actual charge. DeepSeek has peak/off-peak and cached-input rates, so its rate entry records all tiers without selecting one. A missing `usage` or rate is stored as `null`.
+
+`latency_s` is measured locally with a monotonic clock around `model.rank()`: it includes network transit, provider processing, response parsing, and validation. It is **not** a latency field supplied by the API. For a single-process sequential run, `mean_latency_s` averages successful requests only; it is `null` when all requests fail. Failed attempts keep their own `latency_s` in the JSONL file.
 
 ## Test
 

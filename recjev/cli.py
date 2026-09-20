@@ -22,6 +22,7 @@ def main() -> None:
     parser.add_argument("--history-size", type=int, default=20)
     parser.add_argument("--top-k", type=int, default=1)
     parser.add_argument("--output", default="results/predictions.jsonl")
+    parser.add_argument("--rates", default="rates.json", help="Published model rates snapshot, keyed by requested model ID")
     args = parser.parse_args()
     if args.top_k < 1 or args.top_k > args.candidates:
         parser.error("top-k must be between 1 and candidates")
@@ -39,7 +40,10 @@ def main() -> None:
                         args.model, temperature=None if args.omit_temperature else 0)
     if not key:
         parser.error(f"Missing {args.provider.upper()}_API_KEY in .env or environment")
-    print(json.dumps(evaluate(cases, model, args.top_k, args.output), indent=2))
+    with open(args.rates) as file:
+        rates = json.load(file)
+    print(json.dumps(evaluate(cases, model, args.top_k, args.output,
+                              rate=rates.get(model.model)), indent=2))
 
 
 if __name__ == "__main__":

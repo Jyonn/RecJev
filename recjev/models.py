@@ -17,8 +17,12 @@ class OhMyGPT:
                  temperature: float | None = 0):
         self.api_key, self.base_url, self.model, self.timeout = api_key, base_url.rstrip("/"), model, timeout
         self.temperature = temperature
+        self.last_usage: dict | None = None
+        self.last_response_model: str | None = None
 
     def rank(self, case: Case, top_k: int) -> list[str]:
+        self.last_usage = None
+        self.last_response_model = None
         ids = [item.id for item in case.candidates]
         payload = {"model": self.model,
                    "messages": [{"role": "system", "content": f"Recommend movies. Return only a JSON array of exactly {top_k} distinct candidate IDs, best first. Allowed IDs: {', '.join(ids)}."},
@@ -32,7 +36,10 @@ class OhMyGPT:
             timeout=self.timeout,
         )
         response.raise_for_status()
-        content = response.json()["choices"][0]["message"]["content"]
+        body = response.json()
+        self.last_usage = body.get("usage")
+        self.last_response_model = body.get("model")
+        content = body["choices"][0]["message"]["content"]
         if not isinstance(content, str):
             raise ValueError("Model did not return text")
         match = re.search(r"\[[\s\S]*?\]", content)
@@ -44,8 +51,12 @@ class OhMyGPT:
 class Jev:
     def __init__(self, api_key: str, endpoint: str, model: str, timeout: float = 60):
         self.api_key, self.endpoint, self.model, self.timeout = api_key, endpoint, model, timeout
+        self.last_usage: dict | None = None
+        self.last_response_model: str | None = None
 
     def rank(self, case: Case, top_k: int) -> list[str]:
+        self.last_usage = None
+        self.last_response_model = None
         criteria = {item.id: item.title for item in case.candidates}
         response = requests.post(
             self.endpoint,
@@ -55,7 +66,10 @@ class Jev:
             timeout=self.timeout,
         )
         response.raise_for_status()
-        probabilities = response.json()["answers"]["recommend"]["probabilities"]
+        body = response.json()
+        self.last_usage = body.get("usage")
+        self.last_response_model = body.get("model")
+        probabilities = body["answers"]["recommend"]["probabilities"]
         if set(probabilities) != set(criteria):
             raise ValueError("Jev returned a different candidate set")
         ranking = sorted(criteria, key=lambda item_id: (-probabilities[item_id], list(criteria).index(item_id)))[:top_k]

@@ -1,0 +1,51 @@
+{
+  "jev-1.13.0": {
+    "currency": "USD",
+    "unit": "per_1m_tokens",
+    "input": 0.042,
+    "output": 0,
+    "as_of": "2026-09-20",
+    "source": "https://typesafe.ai/blog/introducing-system-one-models-and-jev"
+  },
+  "gpt-4o": {
+    "currency": "USD",
+    "unit": "per_1m_tokens",
+    "input": 2.75,
+    "output": 11.0,
+    "as_of": "2026-09-20",
+    "source": "https://next.ohmygpt.com/models/gpt-4o"
+  },
+  "gpt-5.6-sol": {
+    "currency": "USD",
+    "unit": "per_1m_tokens",
+    "input": 3.6,
+    "output": 18.0,
+    "as_of": "2026-09-20",
+    "source": "https://next.ohmygpt.com/models/gpt-5.6-sol"
+  },
+  "TA/openai/gpt-oss-120b": {
+    "currency": "USD",
+    "unit": "per_1m_tokens",
+    "input": 0.165,
+    "output": 0.66,
+    "as_of": "2026-09-20",
+    "source": "https://next.ohmygpt.com/models/TA%2Fopenai%2Fgpt-oss-120b"
+  },
+  "claude-opus-5": {
+    "currency": "USD",
+    "unit": "per_1m_tokens",
+    "input": 5.5,
+    "output": 27.5,
+    "as_of": "2026-09-20",
+    "source": "https://next.ohmygpt.com/models/claude-opus-5"
+  },
+  "deepseek-chat": {
+    "currency": "CNY",
+    "unit": "per_1m_tokens",
+    "off_peak": {"input": 1.0, "cached_input": 0.02, "output": 4.0},
+    "peak": {"input": 2.0, "cached_input": 0.04, "output": 8.0},
+    "as_of": "2026-09-20",
+    "source": "https://next.ohmygpt.com/models/deepseek-flash",
+    "note": "Compatibility alias; verify response_model and rate window before calculating cost."
+  }
+}
