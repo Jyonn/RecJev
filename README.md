@@ -31,6 +31,20 @@ For each user, the first 80% of timestamp-ordered ratings form the training pref
 
 ## Run
 
+### Paired single-candidate probability experiment
+
+MovieLens 1M has ratings, not clicks. This experiment estimates **the probability of a 4- or 5-star rating**, using ratings below 3 as negatives; it does not measure click-through probability. Each user contributes one held-out positive and one held-out negative. The first 80% of each user's timestamp-ordered ratings is training history; the final 20% supplies the hidden labels. The same 20 rated history movies and one candidate title are sent to every API model. Candidate ratings are never sent.
+
+```bash
+recjev-binary-prepare --data data/ml-1m --sample-size 1000 --seed 42 --history-size 20 --train-fraction 0.8 --output data/ml-1m/binary-1000-seed42.jsonl
+recjev-binary --cases-file data/ml-1m/binary-1000-seed42.jsonl --limit 200 --provider jev --output results/binary-200/jev.jsonl --resume
+recjev-binary --cases-file data/ml-1m/binary-1000-seed42.jsonl --limit 200 --provider ohmygpt --model gpt-4o --output results/binary-200/gpt-4o.jsonl --resume
+```
+
+`--limit 200` selects 100 complete user pairs. Jev uses its Noul yes-probability; an LLM returns a JSON probability for the same 4–5-star event. The key comparison is **pairwise accuracy**: within each user, does the positive receive a higher probability than the negative? Ties count as half. Brier score measures squared probability error, but raw model probabilities may need calibration before use as real-world probabilities. The result JSONL keeps labels, probabilities, latency, usage, and published rate snapshots. Runs resume only when the case set and settings match.
+
+### Candidate ranking experiment
+
 ```bash
 recjev --data data/ml-1m --provider ohmygpt --model gpt-4o --sample-size 1000 --seed 42 --candidates 10 --top-k 3 --output results/gpt.jsonl
 recjev --data data/ml-1m --provider jev --sample-size 1000 --seed 42 --candidates 10 --top-k 3 --output results/jev.jsonl

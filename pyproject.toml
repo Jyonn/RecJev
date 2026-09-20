@@ -12,6 +12,8 @@ dependencies = ["requests>=2.31,<3", "python-dotenv>=1,<2"]
 [project.scripts]
 recjev = "recjev.cli:main"
 recjev-prepare = "recjev.prepare:main"
+recjev-binary-prepare = "recjev.binary_cli:prepare"
+recjev-binary = "recjev.binary_cli:main"
 
 [tool.setuptools.packages.find]
 include = ["recjev*"]
