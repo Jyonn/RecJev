@@ -67,6 +67,14 @@ python -m recjev.local_compare --cases-file data/ml-1m/binary-1000-seed42.jsonl 
 
 Keep the case file and seed fixed. The adapter stays in ignored `results/` and is never committed with the repository.
 
+To test whether the fine-tuned scorer uses user history, construct a deterministic control that keeps every candidate and label fixed but assigns each user another user's history:
+
+```bash
+python -m recjev.history_control --cases-file data/ml-1m/binary-1000-seed42.jsonl --limit 200 --seed 42 --output data/ml-1m/binary-200-shuffled-history-seed42.jsonl
+```
+
+Evaluate the base and adapted Open JEV models on this file with separate output names. A drop relative to the original cases supports a personalization effect; an unchanged score suggests the model mainly uses candidate priors.
+
 ### Candidate ranking experiment
 
 ```bash

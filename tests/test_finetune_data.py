@@ -3,8 +3,10 @@ import tempfile
 import unittest
 from pathlib import Path
 
-from recjev.binary import movielens_pairs, save_cases
+from recjev.binary import BinaryCase, movielens_pairs, save_cases
 from recjev.finetune_data import build
+from recjev.history_control import shuffled_history
+from recjev.protocol import Item
 
 
 class FinetuneDataTest(unittest.TestCase):
@@ -35,6 +37,21 @@ class FinetuneDataTest(unittest.TestCase):
             self.assertEqual(sum(row["label"] for row in validation), len(validation)//2)
             self.assertTrue(all(row["answer"] == ("B" if row["label"] else "A")
                                 for row in train + validation))
+
+    def test_shuffled_history_keeps_targets_and_changes_each_user_history(self):
+        cases = []
+        for user in range(4):
+            history = (Item(str(user), f"History {user}", 5),)
+            for label in (1, 0):
+                cases.append(BinaryCase(f"{user}:{label}", str(user), history,
+                                        Item(f"candidate-{label}", f"Candidate {label}"), label))
+        shuffled = shuffled_history(cases, 42)
+        self.assertEqual(shuffled, shuffled_history(cases, 42))
+        self.assertEqual([(x.id, x.label, x.candidate) for x in cases],
+                         [(x.id, x.label, x.candidate) for x in shuffled])
+        self.assertTrue(all(a.history != b.history for a, b in zip(cases, shuffled)))
+        self.assertTrue(all(a.history == b.history
+                            for a, b in zip(shuffled[::2], shuffled[1::2])))
 
 
 if __name__ == "__main__":
