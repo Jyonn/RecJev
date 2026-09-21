@@ -12,8 +12,18 @@ from dataclasses import asdict, dataclass
 from pathlib import Path
 
 import requests
+from requests.adapters import HTTPAdapter
+from urllib3.util.retry import Retry
 
 from .protocol import Item
+
+
+def api_session() -> requests.Session:
+    session = requests.Session()
+    retry = Retry(total=4, backoff_factor=1, status_forcelist=[429, 500, 502, 503, 504, 529],
+                  allowed_methods=["POST"], respect_retry_after_header=True)
+    session.mount("https://", HTTPAdapter(max_retries=retry))
+    return session
 
 
 @dataclass(frozen=True)
@@ -108,7 +118,7 @@ def context(case: BinaryCase) -> str:
 class JevProbability:
     def __init__(self, key: str, endpoint: str, model: str):
         self.key, self.endpoint, self.model = key, endpoint, model
-        self.session = requests.Session()
+        self.session = api_session()
         self.last_usage = None
         self.last_response_model = None
 
@@ -131,7 +141,7 @@ class LLMProbability:
                  omit_temperature: bool = False, disable_thinking: bool = False):
         self.key, self.base_url, self.model = key, base_url.rstrip("/"), model
         self.omit_temperature, self.disable_thinking = omit_temperature, disable_thinking
-        self.session = requests.Session()
+        self.session = api_session()
         self.last_usage = None
         self.last_response_model = None
 
