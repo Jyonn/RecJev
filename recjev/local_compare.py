@@ -31,7 +31,7 @@ NEXT_TOKEN_SYSTEM = (
 
 class LocalQwen:
     def __init__(self, repo: str | Path, assets: str | Path, mode: str, device: str,
-                 result_model: str | None = None):
+                 result_model: str | None = None, max_new_tokens: int = 64):
         import torch
 
         self.torch = torch
@@ -42,6 +42,7 @@ class LocalQwen:
             "next_token": "qwen3-4b-next-token",
         }[mode]
         self.last_usage = None
+        self.max_new_tokens = max_new_tokens
         self.last_response_model = None
         sys.path.insert(0, str(Path(repo).resolve()))
         from decisionmaking.instruction import InstructionBaseline
@@ -93,7 +94,7 @@ class LocalQwen:
             return probability
 
         with self.torch.no_grad():
-            output = self.engine.model.generate(**inputs, max_new_tokens=64,
+            output = self.engine.model.generate(**inputs, max_new_tokens=self.max_new_tokens,
                                                 do_sample=False,
                                                 pad_token_id=tokenizer.eos_token_id)
         self.torch.cuda.synchronize() if self.engine.device.type == "cuda" else None
@@ -119,17 +120,20 @@ def main() -> None:
     parser.add_argument("--mode", choices=["direct", "generate", "next_token"], required=True)
     parser.add_argument("--device", default="cuda:0")
     parser.add_argument("--result-model", help="Model label stored in result rows")
+    parser.add_argument("--max-new-tokens", type=int, default=64,
+                        help="Generation budget for generate mode")
     parser.add_argument("--output", required=True)
     parser.add_argument("--resume", action="store_true")
     args = parser.parse_args()
     cases = load_cases(args.cases_file, args.limit)
     model = LocalQwen(args.openjev_repo, args.assets, args.mode, args.device,
-                      result_model=args.result_model)
+                      result_model=args.result_model, max_new_tokens=args.max_new_tokens)
     config = {"mode": args.mode, "model_revision": model.revision,
               "question": QUESTION, "positive_option": YES, "negative_option": NO,
               "system_prompt_sha256": hashlib.sha256(
                   (NEXT_TOKEN_SYSTEM if args.mode == "next_token" else GENERATION_SYSTEM).encode()
               ).hexdigest(),
+              "max_new_tokens": args.max_new_tokens if args.mode == "generate" else None,
               "openjev_protocol_sha256": model.engine.protocol_sha256}
     print(json.dumps(evaluate(cases, model, args.output, resume=args.resume,
                               config=config), indent=2))
