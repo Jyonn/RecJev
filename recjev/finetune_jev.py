@@ -89,6 +89,8 @@ def main():
     parser.add_argument("--learning-rate", type=float, default=1e-4)
     parser.add_argument("--seed", type=int, default=42)
     parser.add_argument("--device", default="cuda:0")
+    parser.add_argument("--save-each-epoch", action="store_true",
+                        help="Save a separate adapter and validation result after every epoch")
     args = parser.parse_args()
     if args.epochs < 1 or args.batch_size < 1 or args.grad_accum < 1:
         parser.error("epochs, batch size, and grad accumulation must be positive")
@@ -125,6 +127,7 @@ def main():
                 "train_data_sha256": json.loads((args.data / "manifest.json").read_text())["files_sha256"],
                 "epochs": args.epochs, "batch_size": args.batch_size,
                 "grad_accum": args.grad_accum, "learning_rate": args.learning_rate,
+                "save_each_epoch": args.save_each_epoch,
                 "seed": args.seed, "lora_rank": 16, "lora_alpha": 32,
                 "lora_dropout": 0.05, "target_modules": ["q_proj", "k_proj", "v_proj", "o_proj"],
                 "protocol": "Open JEV two-label next-token cross entropy"}
@@ -148,6 +151,10 @@ def main():
                                   "total_steps": len(loader), "mean_loss": running/step}), flush=True)
         metrics = validate(model, validation_loader, label_ids, device)
         print(json.dumps({"epoch": epoch+1, "validation": metrics}), flush=True)
+        if args.save_each_epoch:
+            model.save_pretrained(args.output / f"adapter-epoch-{epoch+1}")
+            (args.output / f"validation-epoch-{epoch+1}.json").write_text(
+                json.dumps(metrics, indent=2)+"\n")
         if metrics["pairwise_accuracy"] > best:
             best = metrics["pairwise_accuracy"]
             model.save_pretrained(args.output / "adapter")
