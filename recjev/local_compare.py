@@ -30,12 +30,13 @@ NEXT_TOKEN_SYSTEM = (
 
 
 class LocalQwen:
-    def __init__(self, repo: str | Path, assets: str | Path, mode: str, device: str):
+    def __init__(self, repo: str | Path, assets: str | Path, mode: str, device: str,
+                 result_model: str | None = None):
         import torch
 
         self.torch = torch
         self.mode = mode
-        self.model = {
+        self.model = result_model or {
             "direct": "openjev-qwen3-4b-direct",
             "generate": "qwen3-4b-generated",
             "next_token": "qwen3-4b-next-token",
@@ -117,11 +118,13 @@ def main() -> None:
     parser.add_argument("--assets", required=True, help="Open JEV frozen Qwen assets JSON")
     parser.add_argument("--mode", choices=["direct", "generate", "next_token"], required=True)
     parser.add_argument("--device", default="cuda:0")
+    parser.add_argument("--result-model", help="Model label stored in result rows")
     parser.add_argument("--output", required=True)
     parser.add_argument("--resume", action="store_true")
     args = parser.parse_args()
     cases = load_cases(args.cases_file, args.limit)
-    model = LocalQwen(args.openjev_repo, args.assets, args.mode, args.device)
+    model = LocalQwen(args.openjev_repo, args.assets, args.mode, args.device,
+                      result_model=args.result_model)
     config = {"mode": args.mode, "model_revision": model.revision,
               "question": QUESTION, "positive_option": YES, "negative_option": NO,
               "system_prompt_sha256": hashlib.sha256(

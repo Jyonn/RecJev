@@ -51,6 +51,8 @@ python -m recjev.local_compare --cases-file data/ml-1m/binary-1000-seed42.jsonl 
 python -m recjev.local_compare --cases-file data/ml-1m/binary-1000-seed42.jsonl --limit 200 --openjev-repo ../openjev-zhihz --assets ../openjev-zhihz/data/instruction-4b-assets.json --mode next_token --output results/binary-200/qwen3-4b-next-token.jsonl --resume
 ```
 
+Use `--result-model` when evaluating another checkpoint so its model label is distinct in every saved row.
+
 The direct mode uses Open JEV's binary candidate-label softmax; generate mode asks the same Qwen checkpoint for a JSON probability with greedy decoding. `next_token` uses an ordinary prompt ending in a Yes/No instruction and normalizes only the next-token logits for those two single-token answers. All modes use the same case context. Their output probabilities have different meanings and are not presumed calibrated. Record the model revision and protocol hash stored in each result manifest when reporting results.
 
 ### Candidate ranking experiment
