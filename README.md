@@ -55,6 +55,18 @@ Use `--result-model` when evaluating another checkpoint so its model label is di
 
 The direct mode uses Open JEV's binary candidate-label softmax; generate mode asks the same Qwen checkpoint for a JSON probability with greedy decoding. `next_token` uses an ordinary prompt ending in a Yes/No instruction and normalizes only the next-token logits for those two single-token answers. All modes use the same case context. Their output probabilities have different meanings and are not presumed calibrated. Record the model revision and protocol hash stored in each result manifest when reporting results.
 
+### MovieLens fine-tuning pilot
+
+The following optional commands require PyTorch, Transformers, and PEFT on a CUDA machine. The data builder excludes **all users** in the fixed 1000-case file from both training and validation, then splits the remaining users disjointly. It uses the same history, question, and A/No–B/Yes option layout as Open JEV's current readout. Ratings of 3 are discarded; each user contributes up to eight balanced positive/negative pairs from their chronological held-out 20%.
+
+```bash
+python -m recjev.finetune_data --data data/ml-1m --cases-file data/ml-1m/binary-1000-seed42.jsonl --output data/ml-1m/finetune-jev-seed42
+python -m recjev.finetune_jev --assets ../openjev-zhihz/data/instruction-4b-assets.json --data data/ml-1m/finetune-jev-seed42 --output results/finetune/qwen3-4b-openjev-seed42 --epochs 1
+python -m recjev.local_compare --cases-file data/ml-1m/binary-1000-seed42.jsonl --limit 200 --openjev-repo ../openjev-zhihz --assets ../openjev-zhihz/data/instruction-4b-assets.json --adapter results/finetune/qwen3-4b-openjev-seed42/adapter --mode direct --result-model openjev-qwen3-4b-lora-direct --output results/binary-200/openjev-qwen3-4b-lora-direct.jsonl --resume
+```
+
+Keep the case file and seed fixed. The adapter stays in ignored `results/` and is never committed with the repository.
+
 ### Candidate ranking experiment
 
 ```bash

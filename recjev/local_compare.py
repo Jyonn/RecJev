@@ -31,7 +31,8 @@ NEXT_TOKEN_SYSTEM = (
 
 class LocalQwen:
     def __init__(self, repo: str | Path, assets: str | Path, mode: str, device: str,
-                 result_model: str | None = None, max_new_tokens: int = 64):
+                 result_model: str | None = None, max_new_tokens: int = 64,
+                 adapter: str | Path | None = None):
         import torch
 
         self.torch = torch
@@ -49,6 +50,10 @@ class LocalQwen:
         from decisionmaking.instruction import InstructionBaseline
 
         self.engine = InstructionBaseline(assets, device=device, dtype=torch.float16)
+        if adapter:
+            from peft import PeftModel
+
+            self.engine.model = PeftModel.from_pretrained(self.engine.model, adapter).eval()
         self.revision = self.engine.assets["model_revision"]
         self.last_response_model = self.revision
         if mode == "next_token":
@@ -129,6 +134,7 @@ def main() -> None:
     parser.add_argument("--mode", choices=["direct", "generate", "next_token"], required=True)
     parser.add_argument("--device", default="cuda:0")
     parser.add_argument("--result-model", help="Model label stored in result rows")
+    parser.add_argument("--adapter", help="LoRA adapter directory to apply before evaluation")
     parser.add_argument("--max-new-tokens", type=int, default=64,
                         help="Generation budget for generate mode")
     parser.add_argument("--prefill-json", action="store_true",
@@ -138,7 +144,8 @@ def main() -> None:
     args = parser.parse_args()
     cases = load_cases(args.cases_file, args.limit)
     model = LocalQwen(args.openjev_repo, args.assets, args.mode, args.device,
-                      result_model=args.result_model, max_new_tokens=args.max_new_tokens)
+                      result_model=args.result_model, max_new_tokens=args.max_new_tokens,
+                      adapter=args.adapter)
     model.prefill_json = args.prefill_json
     config = {"mode": args.mode, "model_revision": model.revision,
               "question": QUESTION, "positive_option": YES, "negative_option": NO,
@@ -148,6 +155,12 @@ def main() -> None:
               "max_new_tokens": args.max_new_tokens if args.mode == "generate" else None,
               "prefill_json": args.prefill_json if args.mode == "generate" else None,
               "openjev_protocol_sha256": model.engine.protocol_sha256}
+    if args.adapter:
+        adapter_path = Path(args.adapter)
+        config["adapter_config_sha256"] = hashlib.sha256(
+            (adapter_path / "adapter_config.json").read_bytes()).hexdigest()
+        config["adapter_weights_sha256"] = hashlib.sha256(
+            (adapter_path / "adapter_model.safetensors").read_bytes()).hexdigest()
     print(json.dumps(evaluate(cases, model, args.output, resume=args.resume,
                               config=config), indent=2))
 
