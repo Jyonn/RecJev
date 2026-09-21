@@ -43,6 +43,15 @@ recjev-binary --cases-file data/ml-1m/binary-1000-seed42.jsonl --limit 200 --pro
 
 `--limit 200` selects 100 complete user pairs. Jev uses its Noul yes-probability; an LLM returns a JSON probability for the same 4–5-star event. The key comparison is **pairwise accuracy**: within each user, does the positive receive a higher probability than the negative? Ties count as half. Brier score measures squared probability error, but raw model probabilities may need calibration before use as real-world probabilities. The result JSONL keeps labels, probabilities, latency, usage, and published rate snapshots. Runs resume only when the case set and settings match.
 
+To compare [zhihz/Open JEV](https://github.com/zhihz/openjev)'s direct probability readout with ordinary JSON probability generation from **the same pinned Qwen3-4B-Instruct-2507 weights**, first clone that project and fetch its model assets according to its documentation. In an environment with its PyTorch and Transformers dependencies, run:
+
+```bash
+python -m recjev.local_compare --cases-file data/ml-1m/binary-1000-seed42.jsonl --limit 200 --openjev-repo ../openjev-zhihz --assets ../openjev-zhihz/data/instruction-4b-assets.json --mode direct --output results/binary-200/openjev-qwen3-4b-direct.jsonl --resume
+python -m recjev.local_compare --cases-file data/ml-1m/binary-1000-seed42.jsonl --limit 200 --openjev-repo ../openjev-zhihz --assets ../openjev-zhihz/data/instruction-4b-assets.json --mode generate --output results/binary-200/qwen3-4b-generated.jsonl --resume
+```
+
+The direct mode uses Open JEV's binary candidate-label softmax; generate mode asks the same Qwen checkpoint for a JSON probability with greedy decoding. Both use the same case context. Their output probabilities have different meanings and are not presumed calibrated. Record the model revision and protocol hash stored in each result manifest when reporting results.
+
 ### Candidate ranking experiment
 
 ```bash

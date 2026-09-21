@@ -14,6 +14,7 @@ recjev = "recjev.cli:main"
 recjev-prepare = "recjev.prepare:main"
 recjev-binary-prepare = "recjev.binary_cli:prepare"
 recjev-binary = "recjev.binary_cli:main"
+recjev-local-compare = "recjev.local_compare:main"
 
 [tool.setuptools.packages.find]
 include = ["recjev*"]
