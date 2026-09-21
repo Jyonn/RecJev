@@ -43,6 +43,7 @@ class LocalQwen:
         }[mode]
         self.last_usage = None
         self.max_new_tokens = max_new_tokens
+        self.prefill_json = False
         self.last_response_model = None
         sys.path.insert(0, str(Path(repo).resolve()))
         from decisionmaking.instruction import InstructionBaseline
@@ -78,9 +79,15 @@ class LocalQwen:
         system = NEXT_TOKEN_SYSTEM if self.mode == "next_token" else GENERATION_SYSTEM
         messages = [{"role": "system", "content": system},
                     {"role": "user", "content": context(case)}]
+        if self.mode == "generate" and self.prefill_json:
+            messages.append({"role": "assistant", "content": '{"probability":'})
         tokenizer = self.engine.tokenizer
-        prompt = tokenizer.apply_chat_template(messages, tokenize=False,
-                                                add_generation_prompt=True, enable_thinking=False)
+        template_args = {"tokenize": False, "enable_thinking": False}
+        if self.mode == "generate" and self.prefill_json:
+            template_args["continue_final_message"] = True
+        else:
+            template_args["add_generation_prompt"] = True
+        prompt = tokenizer.apply_chat_template(messages, **template_args)
         encoded = tokenizer(prompt, add_special_tokens=False, return_tensors="pt")
         inputs = {key: value.to(self.engine.device) for key, value in encoded.items()}
         if self.mode == "next_token":
@@ -102,6 +109,8 @@ class LocalQwen:
         self.last_usage = {"input_tokens": inputs["input_ids"].shape[1],
                            "output_tokens": len(generated)}
         content = tokenizer.decode(generated, skip_special_tokens=True)
+        if self.prefill_json:
+            content = '{"probability":' + content
         match = re.search(r"\{[\s\S]*?\}", content)
         if not match:
             raise ValueError(f"Expected JSON probability, got {content[:150]}")
@@ -122,18 +131,22 @@ def main() -> None:
     parser.add_argument("--result-model", help="Model label stored in result rows")
     parser.add_argument("--max-new-tokens", type=int, default=64,
                         help="Generation budget for generate mode")
+    parser.add_argument("--prefill-json", action="store_true",
+                        help="Prefill the assistant JSON prefix in generate mode")
     parser.add_argument("--output", required=True)
     parser.add_argument("--resume", action="store_true")
     args = parser.parse_args()
     cases = load_cases(args.cases_file, args.limit)
     model = LocalQwen(args.openjev_repo, args.assets, args.mode, args.device,
                       result_model=args.result_model, max_new_tokens=args.max_new_tokens)
+    model.prefill_json = args.prefill_json
     config = {"mode": args.mode, "model_revision": model.revision,
               "question": QUESTION, "positive_option": YES, "negative_option": NO,
               "system_prompt_sha256": hashlib.sha256(
                   (NEXT_TOKEN_SYSTEM if args.mode == "next_token" else GENERATION_SYSTEM).encode()
               ).hexdigest(),
               "max_new_tokens": args.max_new_tokens if args.mode == "generate" else None,
+              "prefill_json": args.prefill_json if args.mode == "generate" else None,
               "openjev_protocol_sha256": model.engine.protocol_sha256}
     print(json.dumps(evaluate(cases, model, args.output, resume=args.resume,
                               config=config), indent=2))
