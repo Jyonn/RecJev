@@ -1,4 +1,4 @@
-"""Compare Open JEV's direct readout with generation from the same Qwen weights.
+"""Compare three probability protocols using the same local Qwen weights.
 
 Run in an environment with CUDA PyTorch and the dependencies of zhihz/openjev.
 The two modes share the exact local checkpoint and MovieLens case file.
@@ -23,6 +23,10 @@ GENERATION_SYSTEM = (
     "4 or 5 out of 5 rather than 1 or 2. Return only a JSON object like "
     '{"probability": 0.5}. The probability must be between 0 and 1.'
 )
+NEXT_TOKEN_SYSTEM = (
+    "Predict whether this user would rate the candidate movie 4 or 5 out of 5 "
+    "rather than 1 or 2. Answer only Yes or No."
+)
 
 
 class LocalQwen:
@@ -31,7 +35,11 @@ class LocalQwen:
 
         self.torch = torch
         self.mode = mode
-        self.model = "openjev-qwen3-4b-direct" if mode == "direct" else "qwen3-4b-generated"
+        self.model = {
+            "direct": "openjev-qwen3-4b-direct",
+            "generate": "qwen3-4b-generated",
+            "next_token": "qwen3-4b-next-token",
+        }[mode]
         self.last_usage = None
         self.last_response_model = None
         sys.path.insert(0, str(Path(repo).resolve()))
@@ -40,6 +48,13 @@ class LocalQwen:
         self.engine = InstructionBaseline(assets, device=device, dtype=torch.float16)
         self.revision = self.engine.assets["model_revision"]
         self.last_response_model = self.revision
+        if mode == "next_token":
+            self.answer_token_ids = {}
+            for answer in ("Yes", "No"):
+                ids = self.engine.tokenizer.encode(answer, add_special_tokens=False)
+                if len(ids) != 1:
+                    raise ValueError(f"{answer!r} is not one token for this tokenizer: {ids}")
+                self.answer_token_ids[answer] = ids[0]
 
     def predict(self, case: BinaryCase) -> float:
         self.last_usage = None
@@ -58,13 +73,24 @@ class LocalQwen:
             self.last_usage = {"input_tokens": result["input_tokens"], "output_tokens": 0}
             return float(result["probability"])
 
-        messages = [{"role": "system", "content": GENERATION_SYSTEM},
+        system = NEXT_TOKEN_SYSTEM if self.mode == "next_token" else GENERATION_SYSTEM
+        messages = [{"role": "system", "content": system},
                     {"role": "user", "content": context(case)}]
         tokenizer = self.engine.tokenizer
         prompt = tokenizer.apply_chat_template(messages, tokenize=False,
                                                 add_generation_prompt=True, enable_thinking=False)
         encoded = tokenizer(prompt, add_special_tokens=False, return_tensors="pt")
         inputs = {key: value.to(self.engine.device) for key, value in encoded.items()}
+        if self.mode == "next_token":
+            with self.torch.no_grad():
+                logits = self.engine.model(**inputs).logits[0, -1]
+            if self.engine.device.type == "cuda":
+                self.torch.cuda.synchronize()
+            pair = logits[[self.answer_token_ids["Yes"], self.answer_token_ids["No"]]].float()
+            probability = self.torch.softmax(pair, dim=0)[0].item()
+            self.last_usage = {"input_tokens": inputs["input_ids"].shape[1], "output_tokens": 0}
+            return probability
+
         with self.torch.no_grad():
             output = self.engine.model.generate(**inputs, max_new_tokens=64,
                                                 do_sample=False,
@@ -89,7 +115,7 @@ def main() -> None:
     parser.add_argument("--limit", type=int, default=200)
     parser.add_argument("--openjev-repo", required=True)
     parser.add_argument("--assets", required=True, help="Open JEV frozen Qwen assets JSON")
-    parser.add_argument("--mode", choices=["direct", "generate"], required=True)
+    parser.add_argument("--mode", choices=["direct", "generate", "next_token"], required=True)
     parser.add_argument("--device", default="cuda:0")
     parser.add_argument("--output", required=True)
     parser.add_argument("--resume", action="store_true")
@@ -98,7 +124,9 @@ def main() -> None:
     model = LocalQwen(args.openjev_repo, args.assets, args.mode, args.device)
     config = {"mode": args.mode, "model_revision": model.revision,
               "question": QUESTION, "positive_option": YES, "negative_option": NO,
-              "generation_system_sha256": hashlib.sha256(GENERATION_SYSTEM.encode()).hexdigest(),
+              "system_prompt_sha256": hashlib.sha256(
+                  (NEXT_TOKEN_SYSTEM if args.mode == "next_token" else GENERATION_SYSTEM).encode()
+              ).hexdigest(),
               "openjev_protocol_sha256": model.engine.protocol_sha256}
     print(json.dumps(evaluate(cases, model, args.output, resume=args.resume,
                               config=config), indent=2))
